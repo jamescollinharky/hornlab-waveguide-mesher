@@ -2276,8 +2276,13 @@ def build_from_config(
     *,
     allow_large_mesh: bool | None = None,
 ) -> BuildResult:
+    from .mid_ports import parse_mid_ports
+
     resolved = resolve_geometry(config, allow_large_mesh=allow_large_mesh)
     geometry = resolved.geometry
+    # Opt-in mid_ports block: absent/empty = None so the mesh path is
+    # byte-identical to the pre-mid_ports mesher (no call into apply_mid_ports).
+    mid_ports_recipe = parse_mid_ports(_section(config, "mid_ports") or None)
     chose_automatically = (
         _mesh_surface_fit(_section(config, "mesh")) == "auto"
         and getattr(geometry, "surface_fit", None) == "interpolate"
@@ -2288,6 +2293,7 @@ def build_from_config(
             resolved.density,
             output_path,
             scale_to_metres=resolved.scale_to_metres,
+            mid_ports=mid_ports_recipe,
         )
     except TriangleBudgetExceeded:
         # A budget refusal is not a fit failure: the other fit meshes about the
@@ -2317,6 +2323,7 @@ def build_from_config(
             resolved.density,
             output_path,
             scale_to_metres=resolved.scale_to_metres,
+            mid_ports=mid_ports_recipe,
         )
     mesh_report = _mesh_report(info.physical_groups, info.edge_stats_mm)
     freeform_report = resolved.freeform_report

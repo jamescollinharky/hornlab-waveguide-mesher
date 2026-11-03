@@ -210,6 +210,7 @@ def build_mesh_with_info(
     output_path: str | Path | None = None,
     scale_to_metres: bool = True,
     quality_gate: str = "report",
+    mid_ports: object | None = None,
 ) -> tuple[Path, MeshInfo]:
     """Build a ``.msh`` file and return it with the inspection info.
 
@@ -369,6 +370,7 @@ def build_mesh_with_info(
                     and geometry.build_mode.value == 'freestanding' else None),
                 wall_thickness_mm=float(getattr(geometry, 'wall_thickness_mm', 0)),
                 shell_mesh_density=mesh_density,
+                mid_ports=mid_ports,
             )
             limit = effective_triangle_limit(built, mesh_density)
             if limit is not None:
@@ -465,6 +467,7 @@ def _postprocess_mesh(
     shell_surface_groups: dict[str, list[int]] | None = None,
     wall_thickness_mm: float = 0.0,
     shell_mesh_density: MeshDensity | None = None,
+    mid_ports: object | None = None,
 ) -> MeshInfo:
     mesh = meshio.read(raw_path)
     triangles, phys = _triangles_and_physical_tags(mesh)
@@ -553,6 +556,15 @@ def _postprocess_mesh(
         symmetry_snap_tol_mm=symmetry_snap_tol_mm,
         is_open_shell=open_shell_wall_points_mm is not None,
     )
+    mid_ports_report = None
+    if mid_ports is not None:
+        # Opt-in L1 flush mid-port patches: re-tag wall triangles after
+        # orientation is locked (same winding as walls; SOURCE_TAGS includes 10).
+        from .mid_ports import apply_mid_ports
+
+        points, triangles, phys, mid_ports_report = apply_mid_ports(
+            points, triangles, phys, mid_ports
+        )
     points, triangles = _compact_unused_vertices(points, triangles)
     if vertical_offset_mm:
         # Mesh.VerticalOffset: rigid +y placement of the finished reduced/full
@@ -599,6 +611,7 @@ def _postprocess_mesh(
         metadata={
             **({'shellFacetValidation': shell_stats}
                if shell_stats is not None and shell_stats['pairs_before'] else {}),
+            **({"midPorts": mid_ports_report} if mid_ports_report is not None else {}),
             "quality": mesh_quality_report(
                 points,
                 triangles,
