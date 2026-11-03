@@ -144,7 +144,8 @@ def apply_mid_ports(
     # small grow of the (z, across) window so total tag-10 area lands within
     # ~1% of the recipe (plan gate).
     edge = _median_edge_mm(points_mm, triangles[wall]) if np.any(wall) else 4.0
-    grow_lo, grow_hi = 0.0, max(3.0 * edge, 12.0)
+    # Negative grow shrinks the window when the discrete set already overshoots.
+    grow_lo, grow_hi = -0.75 * edge, max(3.0 * edge, 12.0)
     selected = np.zeros(len(triangles), dtype=bool)
     patches: list[dict[str, Any]] = []
     best_rel = 1.0e9
