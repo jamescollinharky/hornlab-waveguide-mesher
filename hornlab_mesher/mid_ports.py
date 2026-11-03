@@ -116,23 +116,13 @@ def apply_mid_ports(
     across = max(recipe.across_frac * max(2.0 * r_ref - 6.0, 1.0), 1.0)
     half_across = 0.5 * across
 
-    # Pre-refine a padded z-band on the inner wall so the final centroid test
-    # does not under-fill the recipe rectangle on a coarse throat mesh.
-    pad = max(half_along, half_across) + 6.0
+    # One refine pass on a padded z-band (not the whole horn): enough for the
+    # area binary-search to hit ~1% without exploding the triangle budget.
+    pad = max(half_along, half_across) + 4.0
     band = wall & (np.abs(cents[:, 2] - z_port) <= pad)
     points_mm, triangles, phys = _subdivide_once(
         points_mm, triangles, phys, band
     )
-    # Second pass on the already-refined band neighbourhood.
-    cents = _centroids(points_mm, triangles)
-    wall = (phys == WALL_TAG) & _inner_wall_mask(
-        points_mm, triangles, cents, phys == WALL_TAG
-    )
-    band = wall & (np.abs(cents[:, 2] - z_port) <= pad)
-    points_mm, triangles, phys = _subdivide_once(
-        points_mm, triangles, phys, band
-    )
-
     cents = _centroids(points_mm, triangles)
     wall = (phys == WALL_TAG) & _inner_wall_mask(
         points_mm, triangles, cents, phys == WALL_TAG
