@@ -80,8 +80,9 @@ def apply_mid_ports(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
     """Re-tag wall triangles inside port patches. Points must be millimetres.
 
-    Selected wall triangles are 4-way midpoint-subdivided once (refine near
-    patches) before retagging to tag 10.
+    Topology is unchanged (retag only): partial subdivision would leave
+    T-junctions on the band boundary. A small grow/shrink of the selection
+    window matches tag-10 area to the recipe within ~1%.
 
     Returns (points_mm, triangles, phys, report).
     """
@@ -116,17 +117,9 @@ def apply_mid_ports(
     across = max(recipe.across_frac * max(2.0 * r_ref - 6.0, 1.0), 1.0)
     half_across = 0.5 * across
 
-    # One refine pass on a padded z-band (not the whole horn): enough for the
-    # area binary-search to hit ~1% without exploding the triangle budget.
-    pad = max(half_along, half_across) + 4.0
-    band = wall & (np.abs(cents[:, 2] - z_port) <= pad)
-    points_mm, triangles, phys = _subdivide_once(
-        points_mm, triangles, phys, band
-    )
-    cents = _centroids(points_mm, triangles)
-    wall = (phys == WALL_TAG) & _inner_wall_mask(
-        points_mm, triangles, cents, phys == WALL_TAG
-    )
+    # Retag only — no partial subdivision (that would leave T-junctions on the
+    # band boundary and fail the search-side manifold guard). Area is matched
+    # by growing/shrinking the (z, across) window against the recipe.
     expected = float(
         len(recipe.walls_list) * recipe.port_along_mm * half_across
     )
